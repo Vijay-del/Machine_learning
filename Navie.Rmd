@@ -1,0 +1,94 @@
+---
+title: "Navie Bayes"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+```{r}
+library(caret)
+library(tm)
+library(e1071)
+library(readr)
+FlightDelays <- read_csv("C:/Users/Vijay/Downloads/FlightDelays.csv")
+View(FlightDelays)
+
+# Converting the Flight Status, Dayweek & Sch.dept.time columns to factors.
+# Flight status : 1(delayed) and 0(on-time)
+FlightDelays$`Flight Status`<-factor(FlightDelays$`Flight Status`,levels = c("delayed","ontime"),labels = c(1,0))
+FlightDelays$DAY_WEEK<-as.factor(FlightDelays$DAY_WEEK)
+FlightDelays$CRS_DEP_TIME<-as.factor(FlightDelays$CRS_DEP_TIME)
+
+# Filtering the predictive variables.
+fd<-FlightDelays[,c(1,10,8,4,2,13)]
+set.seed(15)
+
+#Q1 :
+# Partition of data into 60% (train data) and 40%( validation data)
+train_index<-createDataPartition(FlightDelays$`Flight Status`,p=0.6,list = FALSE)
+train_data<-fd[train_index,]
+valid_data<-fd[-train_index,]
+# Partition of data into 20%(test data) and 80%(traval data)
+test_index<-createDataPartition(FlightDelays$`Flight Status`,p=0.2,list = FALSE)
+test_data<-fd[test_index,]
+traval_data<-fd[-test_index,]
+View(train_data)
+View(test_data)
+
+#Q2 :
+# Navie Bayes model
+nb_model<-naiveBayes(train_data$`Flight Status`~ .,data=train_data)
+
+#Q3 :
+# Count table of number of flight delayed and on-time.
+nb_model$apriori
+#proportion table
+prop.table(nb_model$apriori)
+
+# Predicting the Test Data
+pred_test_label<-predict(nb_model,test_data)
+
+library(gmodels)
+# Confusion Matrix of Test Data
+CrossTable(test_data$`Flight Status`,pred_test_label,prop.chisq = FALSE)
+# Probability of each calss
+pred_test_label1<-predict(nb_model,test_data,type = "raw")
+head(pred_test_label1)
+
+library(pROC)
+roc(test_data$`Flight Status`,pred_test_label1[,2])
+plot.roc(test_data$`Flight Status`,pred_test_label1[,2])
+
+##################################################################
+# Predicting the Validation Data set
+pred_val_label<-predict(nb_model,valid_data)
+
+#Q4 : Confusion Matrix  and ROC for validtion data set. 
+CrossTable(valid_data$`Flight Status`,pred_val_label,prop.chisq = FALSE)
+# Accuracy : 697/880 = 0.792
+# Recall/sensitivity : 658/709 = 0.928
+# Precision : 658/(658+132) = 0.832
+# Specificity : 39/171 = 0.228
+
+pred_val_label1<-predict(nb_model,valid_data,type = "raw")
+roc(valid_data$`Flight Status`,pred_val_label1[,2])
+plot.roc(valid_data$`Flight Status`,pred_val_label1[,2])
+
+###################################################################
+# Predicting the Train and Validation Data sets
+pred_traval_label<-predict(nb_model,traval_data)
+CrossTable(traval_data$`Flight Status`,pred_traval_label,prop.chisq = FALSE)
+pred_traval_label1<-predict(nb_model,traval_data,type = "raw")
+roc(traval_data$`Flight Status`,pred_traval_label1[,2])
+plot.roc(traval_data$`Flight Status`,pred_traval_label1[,2])
+
+##############################################################################
+# Predicting the entire data set 
+pred_fd_label<-predict(nb_model,fd)
+CrossTable(fd$`Flight Status`,pred_fd_label,prop.chisq = FALSE)
+pred_fd_label1<-predict(nb_model,fd,type = "raw")
+roc(fd$`Flight Status`,pred_fd_label1[,2])
+plot.roc(fd$`Flight Status`,pred_fd_label1[,2])
+
+```
+
