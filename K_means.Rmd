@@ -1,0 +1,96 @@
+---
+title: "K_Means"
+output: html_document
+---
+```{r}
+library(readr)
+library(caret)
+library(tidyverse)
+library(factoextra)
+set.seed(123)
+# Importing the dataset
+Universities <- read_csv("C:/Users/Vijay/Downloads/Universities.csv")
+View(Universities)
+
+
+#Qa : Removing the records which have missing values.
+uni<-na.omit(Universities)
+summary(uni)
+
+
+#Qb : 
+uni[,-c(1:3)] # Excluding the categorical variables from the dataset.
+uni_z<-as.data.frame(lapply(uni[,-c(1:3)],scale)) # Normalizing the data, continuous measurements.
+summary(uni_z)
+
+# "Elbow Charts" to determine the value of K
+fviz_nbclust(uni_z,kmeans,method = "wss")
+fviz_nbclust(uni_z,kmeans,method = "silhouette")
+
+#From the above graphs the suitable K value is 3 and performing the K-means clustering analysis for K value.
+uni_cluster<-kmeans(uni_z,3)
+uni_cluster
+
+
+#Qc :
+uni_cluster$size # Size of the clusters
+uni_cluster$centers # Output of the centers
+# From the output, we can infer that there are 3 clusters. Hence the characteristics are given as below:
+
+# Cluster 1("Below Average Uni.")         |    Cluster 2("Above Average Uni.")   |   Cluster 3("Average University")
+# ----------------------------------------|--------------------------------------|-----------------------------------
+#   low applications received             | More no.of new students from top 10% | High applications received 
+#   very low applications accepted        | More no.of new students from top 25% | High applications accepted
+#   very less no.of new students enrolled | High in.state tution                 | High no.of new students enrolled
+#   less no.of students from top 10%      | High out.state tution                | More no. of FT undergraduates
+#   less no.of students from top 25%      | More number of rooms                 | More no. of PT undergraduates
+#   less no. of FT undergraduates         | More number of boards                | More add.fees
+#   less no. of PT undergraduates         | More no.of faculty with PHD          | More book cost 
+#   less in.state tution fees             | High Graduation rate                 | More personal cost
+#   less out.state tution fees            |                                      | More Student.Faculty ratio
+#   less number of rooms                  |                                      |
+#   less number of boards                 |                                      |
+#   less add.fees                         |                                      |
+
+# Visualizing the output
+fviz_cluster(uni_cluster,data = uni_z)
+
+
+#Qd : From the above model, we can relate the cluster labels to the categorical varialbes.
+abc<-cbind(uni$`College Name`,uni$State,uni$`Public (1)/ Private (2)`,uni_cluster$cluster)
+abc<-as.data.frame(abc)
+abc$V3<-factor(abc$V3,levels = c("1","2"),labels = c("Public","Private"))
+abc$V4<-factor(abc$V4,levels = c("1","2","3"),labels = c("Below Average","Above Average","Average"))
+View(abc)
+abc[abc$V4=="Below Average",] # From the data, we can infer below average cluster has mix of private and public universities
+abc[abc$V4=="Above Average",] # From the data, we can infer above average cluster has majority of Private universities
+abc[abc$V4=="Average",] # From the data, we can infer average cluster has majority of public universities 
+
+
+#Qe : The other information which can explain the clusters are
+uni_cluster$betweenss # It is the mean of distance between the cluster centers
+uni_cluster$withinss # It is the mean of distance within the cluster centers
+
+
+#Qf : Considering the Tufts University by taking the average of the cluster.
+uni1<-uni
+Km<-kmeans(uni1[,-c(1:3)],centers = 3)
+b1<-mean(Km$centers[1,]) # Mean of Cluster 1
+b2<-mean(Km$centers[2,]) # Mean of cluster 2
+b3<-mean(Km$centers[3,]) # Mean of cluster 3
+a1<-Universities[Universities$`College Name`=="Tufts University",]
+View(a1)
+a2<-apply(a1[,-c(1:3,10)],1,mean) # Mean of record
+dist(rbind(a2,b1)) # Euclideam distance betweewn  cluster 1 mean and Tufts university data
+dist(rbind(a2,b2))
+dist(rbind(a2,b3))
+a1$`# PT undergrad`<-1529.309 # From the above, Mean value which is near to cluster 1. Hence replacing the missing value with mean value
+uni2<-rbind(uni,a1)
+View(uni2)
+uni2_z<-scale(uni2[,-c(1:3)])
+uni2_cluster<-kmeans(uni2_z,3)
+uni2<-cbind(uni2,uni2_cluster$cluster)
+uni2[472,] # From the model, this uniersity falls under Cluster 2("Above Average")
+
+```
+
