@@ -1,0 +1,131 @@
+---
+title: "Hierarchical cluster"
+author: "Vijay"
+date: "11/15/2019"
+output: html_document
+---
+```{r}
+library(readr)
+Cereals <- read_csv("C:/Users/Vijay/Downloads/Cereals.csv")
+View(Cereals)
+library(cluster)
+library(factoextra)
+library(knitr)
+library(caret)
+set.seed(123)
+
+# Excluding the missing values and categorical variables.
+data<-na.omit(Cereals)
+data_om<-data[,-c(1:3)]
+scale_data<-scale(data_om)
+
+
+#Qa : 
+# Hierarchical Cluster using hclust() function
+d<-dist(scale_data,method = "euclidean")
+hc<-hclust(d,method = "complete")
+plot(hc,cex=0.6,hang=-1)
+
+# Finding the best linkage method 
+hc1<- agnes(scale_data,method = "ward")
+hc2<-agnes(scale_data,method="average")
+hc3<-agnes(scale_data,method="complete")
+hc4<-agnes(scale_data,method="single")
+kable(cbind(ward=hc1$ac,average=hc2$ac,complete=hc3$ac,single=hc4$ac))
+# From the above comparision, "Ward" method has the more accuracy than others.
+
+#Qb :
+# Plotting the Dendogram for agglomerative hierarchical clustering and choosing K=4 clusters since longest path is cutting the dendpogram into 4 clusters. 
+pltree(hc1,cex=0.6,hang=-1,main="Dendrogram of agnes")
+rect.hclust(hc1, k = 4, border = 2:5)
+
+
+# Plotting the Dendogram for divisive hierarchical clustering.
+hcd<-diana(scale_data)
+hcd$dc
+pltree(hcd,cex=0.6,hang=-1,"Dendrogram of diana")
+
+# Mapping the clusters to the data points. 
+clust <- cutree(hc1,k=4) 
+data<-cbind(data,clust)
+
+#Qc :
+# Checking the stability of the cluster
+newdata<-Cereals
+newdata1<-na.omit(newdata) 
+
+train_data<-newdata1[1:60,] # Partition A
+test_data<-newdata1[61:74,] # Partition B
+
+trd<-as.data.frame(scale(train_data[,-c(1:3)]))
+tsd<-as.data.frame(scale(test_data[,-c(1:3)]))
+
+#For Partition A the best method is "ward" 
+hc11<- agnes(trd,method = "ward")
+hc12<-agnes(trd,method="average")
+hc13<-agnes(trd,method="complete")
+hc14<-agnes(trd,method="single")
+kable(cbind(ward=hc11$ac,average=hc12$ac,complete=hc13$ac,single=hc14$ac))
+
+#Dendogram of Partition A
+pltree(hc11,cex=0.6,hang=-1,main="Dendrogram of agnes")
+rect.hclust(hc11, k = 4, border = 2:5)
+clust1<-cutree(hc11,k=4)
+
+#Centers of the cluster
+result<-as.data.frame(cbind(trd,clust1))
+m1<-data.frame(column=seq(1,13,1),mean=rep(0,13))
+m2<-data.frame(column=seq(1,13,1),mean=rep(0,13))
+m3<-data.frame(column=seq(1,13,1),mean=rep(0,13))
+m4<-data.frame(column=seq(1,13,1),mean=rep(0,13))
+for(i in 1:13)
+{
+  m1[i,2]<-mean(result[result$clust==1,i])
+  m2[i,2]<-mean(result[result$clust==2,i])
+  m3[i,2]<-mean(result[result$clust==3,i])
+  m4[i,2]<-mean(result[result$clust==4,i])
+  
+}
+centroid<-t(cbind(m1$mean,m2$mean,m3$mean,m4$mean))
+colnames(centroid)<-colnames(Cereals[,-c(1:3)])
+centroid
+
+# Visualizing the characteristics of Partition A clusters. 
+library(ggplot2)
+library(hrbrthemes)
+library(GGally)
+library(viridis)
+
+ggparcoord(cbind(c(1,2,3,4),centroid),
+           columns = 2:14, groupColumn = 1, 
+           showPoints = TRUE, 
+           title = "Parallel Coordinate Plot for University Data - K = 3",
+           alphaLines = 0.3 
+) 
+
+# Predicitng the Partition B data clusters.
+se<-data.frame(data=seq(1,14,1),cluster=rep(0,14))
+for(i in 1:14)
+{
+  x1<-as.data.frame(rbind(centroid,tsd[i,]))
+  z1<-as.matrix(get_dist(x1))
+  se[i,2]<-which.min(z1[5,-5])
+}
+se
+
+# Compairing the original data labels with the Partition B data labels.
+cbind(partition_labels=se$cluster,data_labels=data[61:74,17])
+# Accuracy of the clusters : 13/14 = 92.8%
+
+
+#Q4 :
+res1<-cbind(newdata1,clust)
+res1[res1$clust==1,]
+res1[res1$clust==2,]
+res1[res1$clust==3,]
+res1[res1$clust==4,]
+#From the above analysis, the cluster 1 has the highest ratings. Hence it will be the "healthy cluster". 
+# We need to essentially normalize the data since the features of data is heterogenous. Therefore, standardizing the data is required.
+
+```
+
