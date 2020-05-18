@@ -1,0 +1,156 @@
+---
+title: "kNN Classifier"
+author: "Vijay"
+output: 
+ html_document:
+   theme: lumen
+   highlight: haddock
+   toc: true
+   toc_float: true
+   toc_depth: 3
+---
+
+### Objective
+Universal bank is a young bank growing rapidly in terms of overall customer acquisition. The majority of these customers are liability customers (depositors) with varying sizes of relationship with the bank. The customer base of asset customers (borrowers) is quite small, and the bank is interested in expanding this base  rapidly in more loan business. In particular, it wants to explore ways of converting its liability customers to personal loan customers. A campaign that the bank ran last year for liability customers showed a healthy conversion rate of over 9% success. This has encouraged the retail marketing department to devise smarter campaigns with better target marketing. The goal is to use k-NN to predict whether a new customer will accept a loan offer. This will serve as the basis for the design of a new campaign.
+
+
+### Libraries
+Libraries which are called for data importing, manipulation, and algorithms used for model construction.
+```{r,message=FALSE}
+library(tidyverse)
+library(caret)
+library(class)
+library(readr)
+library(gmodels)
+```
+
+
+### Importing Data
+Data is imported into Rstudio using readr library.
+```{r,message=FALSE}
+ub <- read_csv("UniversalBank.csv")
+```
+```{r}
+# Structure of the data.
+glimpse(ub)
+
+# Converting the target varialbe to factor
+class(ub$`Personal Loan`)
+ub$`Personal Loan` <- as.factor(ub$`Personal Loan`)
+```
+
+
+Checking the missing values in the data.
+```{r}
+sapply(ub,anyNA)
+```
+
+
+### Data Pre-processing
+Data is split into **train and test** partitions.
+```{r}
+set.seed(123)
+
+# Creating the index of the samples
+index <- createDataPartition(ub$Age,p=0.7,list=FALSE)
+
+# Creating the training samples
+train <- ub[index,]
+
+# Creating the testing samples
+test <- ub[-index,]
+
+# Dimensions of the samples
+dim(train)
+dim(test)
+```
+
+
+**Scaling the data**
+
+
+Since we are using the *distance metric* algorithm, there is need to generalize the data. Hence, *normalization* technique is used.
+```{r}
+# Excluding the "ID","AGE","PERSONAL LOAN" columns from the data
+scaling <- preProcess(train[,-c(1,5,10)],method=c("center","scale"))
+train.norm <- predict(scaling,train[,-c(1,5,10)])
+train.norm$`Personal Loan` <- train$`Personal Loan`
+test.norm <- predict(scaling,test[,-c(1,5,10)])
+```
+
+
+### Model Building
+Building the *base model with default parameters* using 10 fold cross validation.
+```{r}
+# Performing the k-fold cross validation
+myControl <- trainControl(method = "cv",number=10)
+
+# Model with default parameters
+model_default <- train(
+  `Personal Loan`~.,
+  data=train.norm,
+  method="knn",
+  trControl=myControl
+  )
+```
+
+
+The maximum accuracy from the various values of K
+```{r}
+model_default$results[which.max(model_default$results$Accuracy),]
+```
+
+
+Building the *model with grid parameters* using 10 fold cross validation.
+```{r}
+# Grid Parameter K, ranging from 1 to 15
+tuneGrid <- data.frame(k=seq(1,15,1))
+
+# Model with tuneGrid
+model_tune <- train(
+  `Personal Loan`~.,
+  data=train.norm,
+  method="knn",
+  trControl=myControl,
+  tuneGrid=tuneGrid
+)
+```
+
+
+The maximum accuracy from the various values of K
+```{r}
+model_tune$results[which.max(model_tune$results$Accuracy),]
+```
+```{r}
+# Choosing the best hyper parameter
+k_value <- model_tune$bestTune[[1]]
+```
+
+
+The *accuracy* of the best hyperparameter **k = `r model_tune$bestTune[[1]]`** is **`r max(model_tune$results$Accuracy)`**.
+
+
+### Best Model
+Using *class* package, knn model is built with best tuned parameters.
+```{r}
+best_model <- knn(train.norm[,-12],
+                  test.norm,train.norm$`Personal Loan`,
+                  k=k_value,prob = TRUE)
+```
+
+
+### Confusion Matrix
+It is used to evaluate the performance of the model. 
+```{r}
+CrossTable(best_model,test$`Personal Loan`,prop.chisq = FALSE)
+confusionMatrix(best_model,test$`Personal Loan`)
+```
+
+### Result
+Predicting the new scenario whether the customer will accept a loan or not. If result is '1' then *loan accepted* else *loan rejected*
+```{r}
+(Result <- knn(train.norm[,-12],c(Age=40,Experience = 10, Income=84,Family=2,CCAvg=2,
+                               Education=2,Mortgage=0,`Securities Account`=0,
+                               `CD Account`=0,Online=1,CreditCard=1),train.norm$`Personal Loan`,
+              k=k_value))
+```
